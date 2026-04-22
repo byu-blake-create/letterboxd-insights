@@ -1,0 +1,44 @@
+[
+  {
+    "film_id": "arrival",
+    "title": "Arrival",
+    "year": 2016,
+    "letterboxd_uri": "https://letterboxd.com/film/arrival/",
+    "watch_count": 2,
+    "ratings_count": 1,
+    "average_rating": 4.0,
+    "genres": "",
+    "directors": "",
+    "actors": "",
+    "runtime_minutes": null,
+    "imdb_id": null
+  },
+  {
+    "film_id": "dune-part-two",
+    "title": "Dune: Part Two",
+    "year": 2024,
+    "letterboxd_uri": "https://letterboxd.com/film/dune-part-two/",
+    "watch_count": 1,
+    "ratings_count": 1,
+    "average_rating": 4.5,
+    "genres": "",
+    "directors": "",
+    "actors": "",
+    "runtime_minutes": null,
+    "imdb_id": null
+  },
+  {
+    "film_id": "past-lives",
+    "title": "Past Lives",
+    "year": 2023,
+    "letterboxd_uri": "https://letterboxd.com/film/past-lives/",
+    "watch_count": 1,
+    "ratings_count": 1,
+    "average_rating": 4.0,
+    "genres": "",
+    "directors": "",
+    "actors": "",
+    "runtime_minutes": null,
+    "imdb_id": null
+  }
+]

@@ -1,0 +1,84 @@
+{
+  "summary": {
+    "total_films": 3,
+    "total_watches": 4,
+    "total_ratings": 3,
+    "average_rating": 4.167,
+    "total_runtime_minutes": 0,
+    "total_runtime_hours": 0.0
+  },
+  "top_genres": [],
+  "top_actors": [],
+  "top_directors": [],
+  "yearly_watch_breakdown": [
+    {
+      "name": "2025",
+      "count": 4
+    }
+  ],
+  "monthly_watch_breakdown": [
+    {
+      "name": "2025-02",
+      "count": 2
+    },
+    {
+      "name": "2025-01",
+      "count": 1
+    },
+    {
+      "name": "2025-03",
+      "count": 1
+    }
+  ],
+  "decade_library_breakdown": [
+    {
+      "name": "2020",
+      "count": 2
+    },
+    {
+      "name": "2010",
+      "count": 1
+    }
+  ],
+  "rating_distribution": [
+    {
+      "name": "4.0",
+      "count": 2
+    },
+    {
+      "name": "4.5",
+      "count": 1
+    }
+  ],
+  "top_rated_films": [
+    {
+      "title": "Dune: Part Two",
+      "year": 2024,
+      "average_rating": 4.5,
+      "ratings_count": 1
+    },
+    {
+      "title": "Arrival",
+      "year": 2016,
+      "average_rating": 4.0,
+      "ratings_count": 1
+    },
+    {
+      "title": "Past Lives",
+      "year": 2023,
+      "average_rating": 4.0,
+      "ratings_count": 1
+    }
+  ],
+  "most_rewatched_films": [
+    {
+      "title": "Arrival",
+      "year": 2016,
+      "watch_count": 2
+    }
+  ],
+  "runtime_extremes": {
+    "longest_film": null,
+    "shortest_film": null
+  }
+}

@@ -1,0 +1,4 @@
+film_id,title,year,letterboxd_uri,watch_count,ratings_count,average_rating,genres,directors,actors,runtime_minutes,imdb_id
+arrival,Arrival,2016,https://letterboxd.com/film/arrival/,2,1,4.0,,,,,
+dune-part-two,Dune: Part Two,2024,https://letterboxd.com/film/dune-part-two/,1,1,4.5,,,,,
+past-lives,Past Lives,2023,https://letterboxd.com/film/past-lives/,1,1,4.0,,,,,

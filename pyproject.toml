@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "letterboxd-insights"
+version = "0.1.0"
+description = "CLI analytics tool for Letterboxd exports"
+readme = "README.md"
+authors = [{ name = "ndblake" }]
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+letterboxd-insights = "letterboxd_insights.cli:main"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
