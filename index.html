@@ -142,6 +142,12 @@
   </div>
 
   <button class="btn" id="generate-btn" disabled>Generate Insights</button>
+
+  <div id="restore-wrap" style="display:none;width:100%;max-width:520px;text-align:center;">
+    <div style="color:var(--muted);font-size:0.8rem;margin-bottom:0.5rem">— or —</div>
+    <button class="btn" id="restore-btn" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);">Restore Last Session</button>
+    <div style="color:var(--muted);font-size:0.75rem;margin-top:0.4rem" id="restore-meta"></div>
+  </div>
 </div>
 
 <!-- Progress Phase -->
@@ -206,6 +212,26 @@ const dropZone = document.getElementById('drop-zone');
 const zipInput = document.getElementById('zip-input');
 const generateBtn = document.getElementById('generate-btn');
 let selectedFile = null;
+
+// Restore last session
+const REPORT_KEY = 'lbd_last_report_v1';
+function saveReport(insights, films) {
+  try { localStorage.setItem(REPORT_KEY, JSON.stringify({ insights, films, saved: new Date().toLocaleString() })); } catch {}
+}
+function loadSavedReport() {
+  try { return JSON.parse(localStorage.getItem(REPORT_KEY)); } catch { return null; }
+}
+
+const saved = loadSavedReport();
+if (saved) {
+  document.getElementById('restore-wrap').style.display = '';
+  document.getElementById('restore-meta').textContent = 'Last generated: ' + saved.saved;
+  document.getElementById('restore-btn').addEventListener('click', () => {
+    document.getElementById('upload-phase').style.display = 'none';
+    document.getElementById('report-phase').style.display = 'block';
+    renderReport(saved.insights, null, saved.films);
+  });
+}
 
 dropZone.addEventListener('click', () => zipInput.click());
 dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('over'); });
@@ -426,7 +452,7 @@ function computeInsights(records) {
 }
 
 // ─── Render report ────────────────────────────────────────────────
-function renderReport(insights, records) {
+function renderReport(insights, records, precomputedFilms = null) {
   const s = insights.summary;
   const avgR = s.avg_rating || 0;
   const starsFull = Math.floor(avgR);
@@ -510,7 +536,7 @@ function renderReport(insights, records) {
   }
 
   // Search & Filter
-  const films = [...records.values()].map(r => ({
+  const films = precomputedFilms || [...records.values()].map(r => ({
     title: r.title, year: r.year,
     rating: r.ratings.length ? Math.round((r.ratings.reduce((a,b)=>a+b,0)/r.ratings.length)*10)/10 : null,
     watches: r.watchEvents.length || 1,
@@ -519,6 +545,7 @@ function renderReport(insights, records) {
     actors: r.metadata.actors || [],
     uri: r.uri || '',
   }));
+  if (!precomputedFilms) saveReport(insights, films);
 
   const allGenres = [...new Set(films.flatMap(f=>f.genres))].sort();
   const allDecades = [...new Set(films.map(f=>f.year?Math.floor(f.year/10)*10:null).filter(Boolean))].sort();
