@@ -211,11 +211,16 @@
         <select id="f-decade"><option value="">All Decades</option></select>
         <select id="f-rating">
           <option value="">Any Rating</option>
-          <option value="5">5 stars</option>
-          <option value="4.5">4.5+ stars</option>
-          <option value="4">4+ stars</option>
-          <option value="3.5">3.5+ stars</option>
-          <option value="3">3+ stars</option>
+          <option value="5">5 ★ exactly</option>
+          <option value="4.5">4.5+ ★</option>
+          <option value="4">4+ ★</option>
+          <option value="3.5">3.5+ ★</option>
+          <option value="3">3+ ★</option>
+          <option value="2.5">2.5+ ★</option>
+          <option value="2">2+ ★</option>
+          <option value="1.5">1.5+ ★</option>
+          <option value="1">1+ ★</option>
+          <option value="0.5">0.5+ ★</option>
         </select>
         <select id="f-sort">
           <option value="rating">Sort: Rating</option>
@@ -226,6 +231,7 @@
       </div>
       <div id="search-count" style="font-size:0.8rem;color:var(--muted);margin-bottom:0.6rem;"></div>
       <div id="search-results" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;"></div>
+      <div id="search-pagination" style="display:flex;align-items:center;justify-content:center;gap:1rem;padding:0.75rem 0;"></div>
     </div>
   </div>
 </div>
@@ -629,11 +635,34 @@ function renderReport(insights, records, precomputedFilms = null) {
     return `<span style="color:#f5c518;font-size:0.85rem">${'★'.repeat(full)}${half?'½':''}</span> <span style="color:var(--muted);font-size:0.8rem">${r}</span>`;
   }
 
-  function renderResults(list) {
-    document.getElementById('search-count').textContent = list.length + ' film' + (list.length!==1?'s':'');
+  const PAGE_SIZE = 50;
+  let _currentList = [];
+  let _currentPage = 0;
+  window._goPage = (p) => renderResults(_currentList, p);
+
+  function renderResults(list, page = 0) {
+    _currentList = list;
+    _currentPage = page;
+    const total = list.length;
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    const start = page * PAGE_SIZE;
+    const end = Math.min(start + PAGE_SIZE, total);
+    const pageItems = list.slice(start, end);
+
+    const countEl = document.getElementById('search-count');
+    if (totalPages > 1) {
+      countEl.textContent = `${total} film${total!==1?'s':''} — showing ${start+1}–${end}`;
+    } else {
+      countEl.textContent = `${total} film${total!==1?'s':''}`;
+    }
+
     const el = document.getElementById('search-results');
-    if (!list.length) { el.innerHTML = "<p style='padding:1rem;color:var(--muted);font-size:0.9rem'>No films match.</p>"; return; }
-    el.innerHTML = list.map(f => {
+    if (!total) {
+      el.innerHTML = "<p style='padding:1rem;color:var(--muted);font-size:0.9rem'>No films match.</p>";
+      document.getElementById('search-pagination').innerHTML = '';
+      return;
+    }
+    el.innerHTML = pageItems.map(f => {
       const href = f.uri ? `href="${f.uri}" target="_blank"` : '';
       const dirs = f.directors.length ? `<span style="color:var(--muted);font-size:0.78rem">Dir: ${f.directors.join(', ')}</span>` : '';
       const gens = f.genres.length ? `<span style="color:var(--muted);font-size:0.78rem">${f.genres.slice(0,3).join(' · ')}</span>` : '';
@@ -648,6 +677,16 @@ function renderReport(insights, records, precomputedFilms = null) {
         <div style="text-align:right;white-space:nowrap">${starsHTML(f.rating)}</div>
       </div>`;
     }).join('');
+
+    const pgEl = document.getElementById('search-pagination');
+    if (totalPages <= 1) { pgEl.innerHTML = ''; return; }
+    const btnStyle = `background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:0.35rem 0.85rem;border-radius:8px;cursor:pointer;font-size:0.85rem;`;
+    const disabledStyle = `background:none;border:1px solid var(--border);color:var(--muted);padding:0.35rem 0.85rem;border-radius:8px;font-size:0.85rem;cursor:default;`;
+    pgEl.innerHTML = `
+      <button style="${page===0?disabledStyle:btnStyle}" ${page===0?'disabled':''} onclick="_goPage(${page-1})">← Prev</button>
+      <span style="color:var(--muted);font-size:0.85rem">Page ${page+1} of ${totalPages}</span>
+      <button style="${page>=totalPages-1?disabledStyle:btnStyle}" ${page>=totalPages-1?'disabled':''} onclick="_goPage(${page+1})">Next →</button>
+    `;
   }
 
   function applyFilters() {
