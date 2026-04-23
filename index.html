@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Letterboxd Insights</title>
+  <title>Letterstats</title>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -98,7 +98,8 @@
 
 <!-- Upload Phase -->
 <div class="container" id="upload-phase">
-  <div class="logo">Letterboxd <span>Insights</span></div>
+  <div class="logo">Letterstats</div>
+  <div style="color:var(--muted);font-size:0.9rem;margin-top:-1rem">Letterboxd Stats</div>
 
   <div class="drop-zone" id="drop-zone">
     <input type="file" id="zip-input" accept=".zip" />
@@ -133,7 +134,8 @@
   </nav>
   <div class="report-container">
     <header>
-      <h1>Letterboxd Insights</h1>
+      <h1>Letterstats</h1>
+      <span style="color:var(--muted);font-size:0.85rem">Letterboxd Stats</span>
       <span class="meta" id="report-meta"></span>
       <button class="back-btn" onclick="reset()">← New Report</button>
     </header>
