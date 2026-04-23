@@ -65,6 +65,10 @@
     header .meta { color: var(--muted); font-size: 0.8rem; }
     .back-btn { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 8px; padding: 0.3rem 0.8rem; font-size: 0.8rem; cursor: pointer; margin-left: auto; }
     .back-btn:hover { border-color: var(--text); color: var(--text); }
+    .report-nav { position: sticky; top: 0; z-index: 10; background: rgba(20,24,28,0.92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); padding: 0 1rem; display: flex; gap: 0; }
+    .report-nav a { color: var(--muted); text-decoration: none; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.07em; padding: 0.75rem 1.1rem; border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s; }
+    .report-nav a:hover { color: var(--text); }
+    .report-nav a.active { color: var(--green); border-bottom-color: var(--green); }
     .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem; margin-bottom: 2.5rem; }
     .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.2rem 1rem; text-align: center; }
     .stat-card .val { font-size: 2rem; font-weight: 700; color: var(--green); line-height: 1.1; }
@@ -122,6 +126,11 @@
 
 <!-- Report Phase -->
 <div id="report-phase">
+  <nav class="report-nav" id="report-nav">
+    <a href="#sec-distribution">Distribution</a>
+    <a href="#sec-top">Top Films</a>
+    <a href="#sec-search">Search</a>
+  </nav>
   <div class="report-container">
     <header>
       <h1>Letterboxd Insights</h1>
@@ -130,7 +139,7 @@
     </header>
     <div class="stat-grid" id="stat-grid"></div>
     <div id="charts-area"></div>
-    <div class="section" id="search-section">
+    <div class="section" id="sec-search">
       <h2>Search &amp; Filter Your Films</h2>
       <div style="display:flex;flex-wrap:wrap;gap:0.6rem;margin-bottom:1rem;">
         <input type="search" id="q" placeholder="Search title, actor, director, genre…" style="flex:1;min-width:200px;" />
@@ -429,13 +438,13 @@ function renderReport(insights, records) {
   function makeCanvas(id) { return `<div class="chart-wrap"><canvas id="${id}"></canvas></div>`; }
 
   document.getElementById('charts-area').innerHTML = `
-    <div class="section"><h2>Rating Distribution</h2>${makeCanvas('c-rating')}</div>
+    <div id="sec-distribution" class="section"><h2>Rating Distribution</h2>${makeCanvas('c-rating')}</div>
     <div class="two-col section">
       <div><h2>Watches by Year</h2>${makeCanvas('c-yearly')}</div>
       <div><h2>Films by Decade</h2>${makeCanvas('c-decade')}</div>
     </div>
     <div class="section"><h2>Monthly Watch Activity</h2>${makeCanvas('c-monthly')}</div>
-    <div class="two-col section">
+    <div id="sec-top" class="two-col section">
       <div><h2>Top Rated Films</h2><div class="film-list">${filmListHTML(insights.top_rated,'rating','★ ')}</div></div>
       <div><h2>Most Rewatched</h2><div class="film-list">${filmListHTML(insights.most_rewatched,'watches','×')}</div></div>
     </div>
@@ -447,7 +456,7 @@ function renderReport(insights, records) {
   `;
 
   const mk = (id, type, labels, values, color, opts={}) => new Chart(document.getElementById(id), {
-    type, data: { labels, datasets: [{ data: values, backgroundColor: color, borderColor: color, borderRadius: type==='bar'?6:0, fill: type==='line', tension: 0.3, pointRadius: 4, pointBackgroundColor: color, backgroundColor: type==='line'?color.replace(')',',0.1)').replace('rgb','rgba'):color }] },
+    type, data: { labels, datasets: [{ data: values, backgroundColor: type==='bar'?color:'transparent', borderColor: color, borderRadius: type==='bar'?6:0, fill: false, tension: 0.3, pointRadius: 4, pointBackgroundColor: color }] },
     options: { ...chartDefaults, ...opts }
   });
 
@@ -539,6 +548,18 @@ function renderReport(insights, records) {
 
   ['q','f-genre','f-decade','f-rating','f-sort'].forEach(id => document.getElementById(id).addEventListener('input', applyFilters));
   applyFilters();
+
+  // Scroll-spy for nav tabs
+  const navSections = ['sec-distribution','sec-top','sec-search'];
+  const navLinks = document.querySelectorAll('.report-nav a');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        navLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + e.target.id));
+      }
+    });
+  }, { threshold: 0.2 });
+  navSections.forEach(id => { const el = document.getElementById(id); if (el) observer.observe(el); });
 }
 
 // ─── Main pipeline ────────────────────────────────────────────────
