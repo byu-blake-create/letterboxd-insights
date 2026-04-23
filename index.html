@@ -130,16 +130,16 @@
     <p id="file-name" class="file-chosen"></p>
   </div>
 
-  <div class="field-group">
-    <label>OMDb API Key <span style="color:var(--green)">(optional)</span></label>
-    <input type="text" id="omdb-key" placeholder="e.g. a1b2c3d4" autocomplete="off" />
-    <small>Free key at <strong>omdbapi.com/apikey.aspx</strong> — enables genres, directors &amp; actors. Results cached in your browser.</small>
-  </div>
-
   <div style="width:100%;max-width:520px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1rem 1.25rem;font-size:0.85rem;color:var(--muted);line-height:1.7;">
     <strong style="color:var(--text);display:block;margin-bottom:0.4rem">How to get your export</strong>
     On Letterboxd, go to <strong style="color:var(--text)">Settings → Import & Export → Export Your Data</strong>.<br>
     You'll receive a <code style="background:var(--surface2);padding:0.1rem 0.35rem;border-radius:4px;font-size:0.8rem">.zip</code> file — drop it above to get started.
+  </div>
+
+  <div class="field-group">
+    <label>OMDb API Key <span style="color:var(--green)">(optional but highly encouraged)</span></label>
+    <input type="text" id="omdb-key" placeholder="e.g. a1b2c3d4" autocomplete="off" />
+    <small>Free key at <strong>omdbapi.com/apikey.aspx</strong> — enables genres, directors &amp; actors. Results cached in your browser.</small>
   </div>
 
   <button class="btn" id="generate-btn" disabled>Generate Insights</button>
