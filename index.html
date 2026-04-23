@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Letterboxd Insights</title>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #14181c; --surface: #1c2228; --surface2: #242c36;
+      --border: #2c3a47; --green: #00e054; --text: #e8e0d5;
+      --muted: #7a8a94; --accent: #40bcf4; --warn: #f5a623;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    .container { max-width: 860px; margin: 0 auto; padding: 3rem 1.5rem; }
+
+    /* Upload phase */
+    #upload-phase { display: flex; flex-direction: column; align-items: center; gap: 2rem; }
+    .logo { color: var(--green); font-size: 2rem; font-weight: 700; letter-spacing: -1px; }
+    .logo span { color: var(--text); font-weight: 300; }
+    .drop-zone {
+      width: 100%; max-width: 520px; border: 2px dashed var(--border); border-radius: 16px;
+      padding: 3rem 2rem; text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s;
+    }
+    .drop-zone:hover, .drop-zone.over { border-color: var(--green); background: rgba(0,224,84,0.04); }
+    .drop-zone input { display: none; }
+    .drop-zone .icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+    .drop-zone p { color: var(--muted); font-size: 0.9rem; margin-top: 0.4rem; }
+    .drop-zone strong { color: var(--text); }
+    .file-chosen { color: var(--green); font-size: 0.85rem; margin-top: 0.5rem; }
+
+    .field-group { width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 0.4rem; }
+    .field-group label { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .field-group input {
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+      padding: 0.7rem 1rem; color: var(--text); font-size: 0.95rem; outline: none; width: 100%;
+      transition: border-color 0.2s;
+    }
+    .field-group input:focus { border-color: var(--green); }
+    .field-group small { color: var(--muted); font-size: 0.78rem; }
+
+    .btn {
+      background: var(--green); color: #0a0f0a; border: none; border-radius: 10px;
+      padding: 0.85rem 2.5rem; font-size: 1rem; font-weight: 700; cursor: pointer;
+      transition: opacity 0.15s; letter-spacing: 0.01em;
+    }
+    .btn:hover { opacity: 0.88; }
+    .btn:disabled { opacity: 0.35; cursor: default; }
+
+    /* Progress phase */
+    #progress-phase { display: none; flex-direction: column; align-items: center; gap: 1.5rem; text-align: center; padding-top: 4rem; }
+    .progress-label { color: var(--muted); font-size: 0.9rem; }
+    .progress-bar-wrap { width: 100%; max-width: 420px; height: 6px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; background: var(--green); border-radius: 4px; transition: width 0.3s; width: 0%; }
+    .progress-title { font-size: 1.1rem; color: var(--text); }
+
+    /* Report phase */
+    #report-phase { display: none; }
+    .report-container { max-width: 1100px; margin: 0 auto; padding: 2rem 1rem; }
+    header { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 2rem; border-bottom: 1px solid var(--border); padding-bottom: 1rem; }
+    header h1 { font-size: 1.8rem; color: var(--green); letter-spacing: -0.5px; }
+    header .meta { color: var(--muted); font-size: 0.8rem; }
+    .back-btn { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 8px; padding: 0.3rem 0.8rem; font-size: 0.8rem; cursor: pointer; margin-left: auto; }
+    .back-btn:hover { border-color: var(--text); color: var(--text); }
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem; margin-bottom: 2.5rem; }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.2rem 1rem; text-align: center; }
+    .stat-card .val { font-size: 2rem; font-weight: 700; color: var(--green); line-height: 1.1; }
+    .stat-card .label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.3rem; }
+    .section { margin-bottom: 2.5rem; }
+    .section h2 { font-size: 1rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 1rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+    .chart-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; }
+    .chart-wrap canvas { max-height: 280px; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 640px) { .two-col { grid-template-columns: 1fr; } }
+    .film-list { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.25rem; }
+    .film-row { display: flex; align-items: baseline; gap: 0.6rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+    .film-row:last-child { border-bottom: none; }
+    .rank { color: var(--muted); font-size: 0.75rem; min-width: 1.8rem; }
+    .film-title { flex: 1; color: var(--text); }
+    .year { color: var(--muted); font-size: 0.8rem; }
+    .film-val { color: var(--green); font-weight: 600; font-size: 0.85rem; }
+    .no-data { color: var(--muted); font-size: 0.85rem; padding: 0.5rem 0; }
+    select, input[type=search] {
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+      padding: 0.55rem 0.7rem; color: var(--text); font-size: 0.85rem; outline: none;
+    }
+    input[type=search]:focus, select:focus { border-color: var(--green); }
+  </style>
+</head>
+<body>
+
+<!-- Upload Phase -->
+<div class="container" id="upload-phase">
+  <div class="logo">Letterboxd <span>Insights</span></div>
+
+  <div class="drop-zone" id="drop-zone">
+    <input type="file" id="zip-input" accept=".zip" />
+    <div class="icon">🎬</div>
+    <strong>Drop your Letterboxd export zip here</strong>
+    <p>or click to browse</p>
+    <p id="file-name" class="file-chosen"></p>
+  </div>
+
+  <div class="field-group">
+    <label>OMDb API Key <span style="color:var(--green)">(optional)</span></label>
+    <input type="text" id="omdb-key" placeholder="e.g. a1b2c3d4" autocomplete="off" />
+    <small>Free key at <strong>omdbapi.com/apikey.aspx</strong> — enables genres, directors &amp; actors. Results cached in your browser.</small>
+  </div>
+
+  <button class="btn" id="generate-btn" disabled>Generate Insights</button>
+</div>
+
+<!-- Progress Phase -->
+<div class="container" id="progress-phase">
+  <div class="progress-title" id="progress-title">Processing…</div>
+  <div class="progress-label" id="progress-label"></div>
+  <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progress-bar"></div></div>
+</div>
+
+<!-- Report Phase -->
+<div id="report-phase">
+  <div class="report-container">
+    <header>
+      <h1>Letterboxd Insights</h1>
+      <span class="meta" id="report-meta"></span>
+      <button class="back-btn" onclick="reset()">← New Report</button>
+    </header>
+    <div class="stat-grid" id="stat-grid"></div>
+    <div id="charts-area"></div>
+    <div class="section" id="search-section">
+      <h2>Search &amp; Filter Your Films</h2>
+      <div style="display:flex;flex-wrap:wrap;gap:0.6rem;margin-bottom:1rem;">
+        <input type="search" id="q" placeholder="Search title, actor, director, genre…" style="flex:1;min-width:200px;" />
+        <select id="f-genre"><option value="">All Genres</option></select>
+        <select id="f-decade"><option value="">All Decades</option></select>
+        <select id="f-rating">
+          <option value="">Any Rating</option>
+          <option value="5">5 stars</option>
+          <option value="4.5">4.5+ stars</option>
+          <option value="4">4+ stars</option>
+          <option value="3.5">3.5+ stars</option>
+          <option value="3">3+ stars</option>
+        </select>
+        <select id="f-sort">
+          <option value="rating">Sort: Rating</option>
+          <option value="title">Sort: Title</option>
+          <option value="year">Sort: Year</option>
+          <option value="watches">Sort: Most Watched</option>
+        </select>
+      </div>
+      <div id="search-count" style="font-size:0.8rem;color:var(--muted);margin-bottom:0.6rem;"></div>
+      <div id="search-results" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Upload UI ────────────────────────────────────────────────────
+const dropZone = document.getElementById('drop-zone');
+const zipInput = document.getElementById('zip-input');
+const generateBtn = document.getElementById('generate-btn');
+let selectedFile = null;
+
+dropZone.addEventListener('click', () => zipInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('over');
+  const f = e.dataTransfer.files[0];
+  if (f && f.name.endsWith('.zip')) setFile(f);
+});
+zipInput.addEventListener('change', () => { if (zipInput.files[0]) setFile(zipInput.files[0]); });
+
+function setFile(f) {
+  selectedFile = f;
+  document.getElementById('file-name').textContent = '✓ ' + f.name;
+  generateBtn.disabled = false;
+}
+
+generateBtn.addEventListener('click', () => run());
+
+function reset() {
+  selectedFile = null;
+  zipInput.value = '';
+  document.getElementById('file-name').textContent = '';
+  generateBtn.disabled = true;
+  document.getElementById('upload-phase').style.display = '';
+  document.getElementById('progress-phase').style.display = 'none';
+  document.getElementById('report-phase').style.display = 'none';
+  // destroy charts
+  Chart.helpers.each(Chart.instances, c => c.destroy());
+}
+
+// ─── Progress helpers ─────────────────────────────────────────────
+function showProgress(title, label, pct) {
+  document.getElementById('progress-title').textContent = title;
+  document.getElementById('progress-label').textContent = label;
+  document.getElementById('progress-bar').style.width = pct + '%';
+}
+
+// ─── Rating parser ────────────────────────────────────────────────
+function parseRating(raw) {
+  if (!raw) return null;
+  raw = raw.trim();
+  if (/^\d+(\.\d+)?$/.test(raw)) return parseFloat(raw);
+  if (/^\d+(\.\d+)?\s*\/\s*5$/.test(raw)) return parseFloat(raw);
+  if (/^[★½]+$/.test(raw)) {
+    let v = 0;
+    for (const c of raw) v += c === '★' ? 1 : 0.5;
+    return v;
+  }
+  return null;
+}
+
+// ─── CSV normalization ────────────────────────────────────────────
+function norm(key) { return key.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''); }
+function firstVal(row, aliases) {
+  for (const a of aliases) if (row[a]) return row[a];
+  return null;
+}
+
+// ─── Ingest ───────────────────────────────────────────────────────
+function buildRecords(ratingsRows, diaryRows) {
+  const records = new Map();
+
+  function getOrCreate(title, year, uri) {
+    const key = title.trim().toLowerCase() + '|' + (year || '');
+    if (!records.has(key)) records.set(key, { title: title.trim(), year, uri: uri || '', ratings: [], watchEvents: [], metadata: {} });
+    const r = records.get(key);
+    if (uri && !r.uri) r.uri = uri;
+    return r;
+  }
+
+  for (const rawRow of ratingsRows) {
+    const row = {};
+    for (const k in rawRow) row[norm(k)] = (rawRow[k] || '').trim();
+    const title = firstVal(row, ['name','title','film','film_name','movie']);
+    const year = parseInt(firstVal(row, ['year','release_year'])) || null;
+    const uri = firstVal(row, ['letterboxd_uri','letterboxd_url','uri','url']);
+    if (!title) continue;
+    const rec = getOrCreate(title, year, uri);
+    const rating = parseRating(firstVal(row, ['rating','your_rating','stars']));
+    if (rating !== null) rec.ratings.push(rating);
+  }
+
+  for (const rawRow of diaryRows) {
+    const row = {};
+    for (const k in rawRow) row[norm(k)] = (rawRow[k] || '').trim();
+    const title = firstVal(row, ['name','title','film']);
+    const year = parseInt(firstVal(row, ['year','release_year'])) || null;
+    const uri = firstVal(row, ['letterboxd_uri','letterboxd_url','uri','url']);
+    if (!title) continue;
+    const rec = getOrCreate(title, year, uri);
+    const dateRaw = firstVal(row, ['watched_date','date','diary_date','watched_on']);
+    const rewatch = firstVal(row, ['rewatch','rewatched']);
+    if (dateRaw) rec.watchEvents.push({ date: dateRaw, rewatch: /yes|true|1/i.test(rewatch || '') });
+  }
+
+  return records;
+}
+
+// ─── OMDb enrichment ──────────────────────────────────────────────
+const CACHE_KEY = 'lbd_omdb_cache_v1';
+function loadCache() { try { return JSON.parse(localStorage.getItem(CACHE_KEY) || '{}'); } catch { return {}; } }
+function saveCache(c) { try { localStorage.setItem(CACHE_KEY, JSON.stringify(c)); } catch {} }
+
+async function fetchOMDb(title, year, apiKey) {
+  try {
+    const params = new URLSearchParams({ apikey: apiKey, t: title, r: 'json' });
+    if (year) params.set('y', String(year));
+    const res = await fetch('https://www.omdbapi.com/?' + params);
+    const data = await res.json();
+    if (data.Response === 'False') return null;
+    return {
+      genres: splitCSV(data.Genre),
+      directors: splitCSV(data.Director),
+      actors: splitCSV(data.Actors),
+      runtime_minutes: parseRuntime(data.Runtime),
+      imdb_id: data.imdbID || null,
+    };
+  } catch { return null; }
+}
+
+function splitCSV(s) { if (!s || s === 'N/A') return []; return s.split(',').map(x => x.trim()).filter(Boolean); }
+function parseRuntime(s) { if (!s || s === 'N/A') return null; const m = parseInt(s); return isNaN(m) ? null : m; }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function enrichRecords(records, apiKey, onProgress) {
+  const cache = loadCache();
+  let done = 0;
+  const total = records.size;
+  for (const [, rec] of records) {
+    const cacheKey = rec.title.toLowerCase() + '|' + (rec.year || '');
+    if (cache[cacheKey]) {
+      rec.metadata = cache[cacheKey];
+    } else if (apiKey) {
+      const data = await fetchOMDb(rec.title, rec.year, apiKey);
+      if (data) { rec.metadata = data; cache[cacheKey] = data; }
+      await sleep(260);
+    }
+    done++;
+    onProgress(done, total);
+  }
+  if (apiKey) saveCache(cache);
+}
+
+// ─── Analytics ───────────────────────────────────────────────────
+function computeInsights(records) {
+  const films = [...records.values()];
+
+  const allRatings = films.flatMap(f => f.ratings);
+  const avgRating = allRatings.length ? (allRatings.reduce((a,b)=>a+b,0)/allRatings.length) : null;
+
+  // rating distribution
+  const ratingDist = {};
+  for (const r of allRatings) {
+    const k = (Math.round(r * 2) / 2).toFixed(1);
+    ratingDist[k] = (ratingDist[k] || 0) + 1;
+  }
+
+  const genreCounter = {}, actorCounter = {}, directorCounter = {};
+  const yearlyCounter = {}, monthlyCounter = {}, decadeCounter = {};
+  let totalRuntime = 0;
+
+  for (const film of films) {
+    for (const g of (film.metadata.genres || [])) genreCounter[g] = (genreCounter[g] || 0) + 1;
+    for (const a of (film.metadata.actors || [])) actorCounter[a] = (actorCounter[a] || 0) + 1;
+    for (const d of (film.metadata.directors || [])) directorCounter[d] = (directorCounter[d] || 0) + 1;
+    for (const ev of film.watchEvents) {
+      if (ev.date) {
+        const yr = ev.date.slice(0,4);
+        const mo = ev.date.slice(0,7);
+        yearlyCounter[yr] = (yearlyCounter[yr] || 0) + 1;
+        monthlyCounter[mo] = (monthlyCounter[mo] || 0) + 1;
+      }
+    }
+    if (film.year) {
+      const decade = String(Math.floor(film.year / 10) * 10);
+      decadeCounter[decade] = (decadeCounter[decade] || 0) + 1;
+    }
+    if (film.metadata.runtime_minutes) totalRuntime += film.metadata.runtime_minutes;
+  }
+
+  function ranked(obj, limit) {
+    return Object.entries(obj).sort((a,b)=>b[1]-a[1]).slice(0,limit||999).map(([name,count])=>({name,count}));
+  }
+
+  const topRated = films
+    .filter(f => f.ratings.length)
+    .map(f => ({ title: f.title, year: f.year, rating: Math.round((f.ratings.reduce((a,b)=>a+b,0)/f.ratings.length)*10)/10 }))
+    .sort((a,b) => b.rating - a.rating)
+    .slice(0,10);
+
+  const mostRewatched = films
+    .filter(f => f.watchEvents.length > 1)
+    .map(f => ({ title: f.title, year: f.year, watches: f.watchEvents.length }))
+    .sort((a,b) => b.watches - a.watches)
+    .slice(0,10);
+
+  const totalWatches = films.reduce((s,f) => s + (f.watchEvents.length || 1), 0);
+
+  return {
+    summary: {
+      total_films: films.length,
+      total_watches: totalWatches,
+      total_ratings: allRatings.length,
+      avg_rating: avgRating ? Math.round(avgRating * 1000) / 1000 : null,
+      runtime_hours: Math.round(totalRuntime / 60),
+    },
+    rating_distribution: ranked(ratingDist).sort((a,b)=>parseFloat(a.name)-parseFloat(b.name)),
+    yearly: ranked(yearlyCounter).sort((a,b)=>a.name.localeCompare(b.name)),
+    monthly: ranked(monthlyCounter).sort((a,b)=>a.name.localeCompare(b.name)).slice(-18),
+    decades: ranked(decadeCounter).sort((a,b)=>a.name.localeCompare(b.name)),
+    genres: ranked(genreCounter, 15),
+    directors: ranked(directorCounter, 20),
+    actors: ranked(actorCounter, 20),
+    top_rated: topRated,
+    most_rewatched: mostRewatched,
+  };
+}
+
+// ─── Render report ────────────────────────────────────────────────
+function renderReport(insights, records) {
+  const s = insights.summary;
+  const avgR = s.avg_rating || 0;
+  const starsFull = Math.round(avgR);
+  const starsStr = '★'.repeat(starsFull) + '☆'.repeat(5 - starsFull);
+
+  document.getElementById('report-meta').textContent = 'Generated ' + new Date().toLocaleString();
+
+  // Stats
+  document.getElementById('stat-grid').innerHTML = `
+    <div class="stat-card"><div class="val">${s.total_films}</div><div class="label">Unique Films</div></div>
+    <div class="stat-card"><div class="val">${s.total_watches}</div><div class="label">Total Watches</div></div>
+    <div class="stat-card"><div class="val">${s.total_ratings}</div><div class="label">Ratings Given</div></div>
+    <div class="stat-card"><div class="val"><span style="color:#f5c518">${starsStr}</span><br><span style="font-size:1.1rem">${avgR}</span></div><div class="label">Avg Rating</div></div>
+    <div class="stat-card"><div class="val">${s.runtime_hours}h</div><div class="label">Total Runtime</div></div>
+  `;
+
+  const GRID = { color: 'rgba(255,255,255,0.06)' };
+  const TICK = { color: '#7a8a94', font: { size: 11 } };
+  const chartDefaults = {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: { x: { grid: GRID, ticks: TICK }, y: { grid: GRID, ticks: TICK, beginAtZero: true } }
+  };
+
+  function filmListHTML(items, valKey, prefix) {
+    if (!items.length) return "<p class='no-data'>No data.</p>";
+    return items.map((f,i) => `<div class="film-row">
+      <span class="rank">#${i+1}</span>
+      <span class="film-title">${f.title} <span class="year">(${f.year||''})</span></span>
+      <span class="film-val">${prefix||''}${f[valKey]}</span>
+    </div>`).join('');
+  }
+
+  function rankedListHTML(items) {
+    if (!items.length) return "<p class='no-data'>No data — run with OMDb key to enable.</p>";
+    return items.slice(0,10).map((f,i) => `<div class="film-row">
+      <span class="rank">#${i+1}</span>
+      <span class="film-title">${f.name}</span>
+      <span class="film-val">${f.count}</span>
+    </div>`).join('');
+  }
+
+  function makeCanvas(id) { return `<div class="chart-wrap"><canvas id="${id}"></canvas></div>`; }
+
+  document.getElementById('charts-area').innerHTML = `
+    <div class="section"><h2>Rating Distribution</h2>${makeCanvas('c-rating')}</div>
+    <div class="two-col section">
+      <div><h2>Watches by Year</h2>${makeCanvas('c-yearly')}</div>
+      <div><h2>Films by Decade</h2>${makeCanvas('c-decade')}</div>
+    </div>
+    <div class="section"><h2>Monthly Watch Activity</h2>${makeCanvas('c-monthly')}</div>
+    <div class="two-col section">
+      <div><h2>Top Rated Films</h2><div class="film-list">${filmListHTML(insights.top_rated,'rating','★ ')}</div></div>
+      <div><h2>Most Rewatched</h2><div class="film-list">${filmListHTML(insights.most_rewatched,'watches','×')}</div></div>
+    </div>
+    <div class="two-col section">
+      <div><h2>Top Directors</h2><div class="film-list">${rankedListHTML(insights.directors)}</div></div>
+      <div><h2>Top Actors</h2><div class="film-list">${rankedListHTML(insights.actors)}</div></div>
+    </div>
+    <div class="section"><h2>Top Genres</h2>${makeCanvas('c-genre')}</div>
+  `;
+
+  const mk = (id, type, labels, values, color, opts={}) => new Chart(document.getElementById(id), {
+    type, data: { labels, datasets: [{ data: values, backgroundColor: color, borderColor: color, borderRadius: type==='bar'?6:0, fill: type==='line', tension: 0.3, pointRadius: 4, pointBackgroundColor: color, backgroundColor: type==='line'?color.replace(')',',0.1)').replace('rgb','rgba'):color }] },
+    options: { ...chartDefaults, ...opts }
+  });
+
+  mk('c-rating','bar', insights.rating_distribution.map(x=>x.name+' ★'), insights.rating_distribution.map(x=>x.count), '#00e054');
+  mk('c-yearly','bar', insights.yearly.map(x=>x.name), insights.yearly.map(x=>x.count), '#40bcf4');
+  mk('c-decade','bar', insights.decades.map(x=>x.name+'s'), insights.decades.map(x=>x.count), '#f5a623');
+  mk('c-monthly','line', insights.monthly.map(x=>x.name), insights.monthly.map(x=>x.count), '#00e054');
+
+  if (insights.genres.length) {
+    mk('c-genre','bar', insights.genres.map(x=>x.name), insights.genres.map(x=>x.count), '#9b59b6', {
+      indexAxis:'y', scales:{ x:{grid:GRID,ticks:TICK}, y:{grid:GRID,ticks:{...TICK,font:{size:12}}} }
+    });
+  } else {
+    document.getElementById('c-genre').parentElement.innerHTML = "<p class='no-data' style='padding:1rem'>No genre data — add an OMDb API key to enable.</p>";
+  }
+
+  // Search & Filter
+  const films = [...records.values()].map(r => ({
+    title: r.title, year: r.year,
+    rating: r.ratings.length ? Math.round((r.ratings.reduce((a,b)=>a+b,0)/r.ratings.length)*10)/10 : null,
+    watches: r.watchEvents.length || 1,
+    genres: r.metadata.genres || [],
+    directors: r.metadata.directors || [],
+    actors: r.metadata.actors || [],
+    uri: r.uri || '',
+  }));
+
+  const allGenres = [...new Set(films.flatMap(f=>f.genres))].sort();
+  const allDecades = [...new Set(films.map(f=>f.year?Math.floor(f.year/10)*10:null).filter(Boolean))].sort();
+  const gSel = document.getElementById('f-genre');
+  const dSel = document.getElementById('f-decade');
+  allGenres.forEach(g => { const o=document.createElement('option'); o.value=g; o.textContent=g; gSel.appendChild(o); });
+  allDecades.forEach(d => { const o=document.createElement('option'); o.value=d; o.textContent=d+'s'; dSel.appendChild(o); });
+
+  function starsHTML(r) {
+    if (r===null) return '<span style="color:var(--muted)">—</span>';
+    const full=Math.floor(r), half=r%1>=0.5?1:0;
+    return `<span style="color:#f5c518;font-size:0.85rem">${'★'.repeat(full)}${half?'½':''}</span> <span style="color:var(--muted);font-size:0.8rem">${r}</span>`;
+  }
+
+  function renderResults(list) {
+    document.getElementById('search-count').textContent = list.length + ' film' + (list.length!==1?'s':'');
+    const el = document.getElementById('search-results');
+    if (!list.length) { el.innerHTML = "<p style='padding:1rem;color:var(--muted);font-size:0.9rem'>No films match.</p>"; return; }
+    el.innerHTML = list.map(f => {
+      const href = f.uri ? `href="${f.uri}" target="_blank"` : '';
+      const dirs = f.directors.length ? `<span style="color:var(--muted);font-size:0.78rem">Dir: ${f.directors.join(', ')}</span>` : '';
+      const gens = f.genres.length ? `<span style="color:var(--muted);font-size:0.78rem">${f.genres.slice(0,3).join(' · ')}</span>` : '';
+      const acts = f.actors.length ? `<span style="color:var(--muted);font-size:0.78rem">${f.actors.slice(0,3).join(', ')}</span>` : '';
+      const badge = f.watches>1 ? `<span style="background:#1a3a2a;color:var(--green);font-size:0.7rem;padding:0.1rem 0.4rem;border-radius:4px;margin-left:0.4rem">×${f.watches}</span>` : '';
+      return `<div style="display:grid;grid-template-columns:1fr auto;gap:0.4rem 1rem;padding:0.65rem 1.2rem;border-bottom:1px solid var(--border);align-items:start;">
+        <div>
+          <a ${href} style="color:var(--text);text-decoration:none;font-size:0.95rem;font-weight:500">${f.title}</a>
+          <span style="color:var(--muted);font-size:0.8rem;margin-left:0.4rem">${f.year||''}</span>${badge}
+          <div style="margin-top:0.2rem;display:flex;flex-wrap:wrap;gap:0.4rem">${dirs}${gens}${acts}</div>
+        </div>
+        <div style="text-align:right;white-space:nowrap">${starsHTML(f.rating)}</div>
+      </div>`;
+    }).join('');
+  }
+
+  function applyFilters() {
+    const q = document.getElementById('q').value.trim().toLowerCase();
+    const genre = gSel.value;
+    const decade = dSel.value ? parseInt(dSel.value) : null;
+    const minRating = parseFloat(document.getElementById('f-rating').value) || null;
+    const sortBy = document.getElementById('f-sort').value;
+
+    let results = films.filter(f => {
+      if (genre && !f.genres.includes(genre)) return false;
+      if (decade && (!f.year || Math.floor(f.year/10)*10 !== decade)) return false;
+      if (minRating !== null && (f.rating === null || f.rating < minRating)) return false;
+      if (q) {
+        const hay = [f.title, ...f.actors, ...f.directors, ...f.genres].join(' ').toLowerCase();
+        if (!q.split(' ').filter(Boolean).every(w => hay.includes(w))) return false;
+      }
+      return true;
+    });
+
+    results.sort((a,b) => {
+      if (sortBy==='title') return a.title.localeCompare(b.title);
+      if (sortBy==='year') return (b.year||0)-(a.year||0);
+      if (sortBy==='watches') return b.watches-a.watches;
+      return (b.rating||0)-(a.rating||0);
+    });
+
+    renderResults(results);
+  }
+
+  ['q','f-genre','f-decade','f-rating','f-sort'].forEach(id => document.getElementById(id).addEventListener('input', applyFilters));
+  applyFilters();
+}
+
+// ─── Main pipeline ────────────────────────────────────────────────
+async function run() {
+  if (!selectedFile) return;
+  const apiKey = document.getElementById('omdb-key').value.trim();
+
+  document.getElementById('upload-phase').style.display = 'none';
+  document.getElementById('progress-phase').style.display = 'flex';
+
+  showProgress('Reading zip…', '', 5);
+  await sleep(50);
+
+  const zip = await JSZip.loadAsync(selectedFile);
+
+  function findFile(name) {
+    const exact = zip.file(name);
+    if (exact) return exact;
+    const match = Object.keys(zip.files).find(k => k.endsWith('/' + name) && !zip.files[k].dir);
+    return match ? zip.file(match) : null;
+  }
+
+  const ratingsFile = findFile('ratings.csv');
+  const diaryFile = findFile('diary.csv');
+
+  if (!ratingsFile && !diaryFile) {
+    alert('Could not find ratings.csv or diary.csv in your zip. Make sure you exported from Letterboxd correctly.');
+    reset(); return;
+  }
+
+  showProgress('Parsing CSVs…', '', 15);
+  await sleep(50);
+
+  const ratingsText = ratingsFile ? await ratingsFile.async('text') : '';
+  const diaryText = diaryFile ? await diaryFile.async('text') : '';
+
+  const ratingsRows = ratingsText ? Papa.parse(ratingsText, { header: true, skipEmptyLines: true }).data : [];
+  const diaryRows = diaryText ? Papa.parse(diaryText, { header: true, skipEmptyLines: true }).data : [];
+
+  showProgress('Building film records…', '', 30);
+  await sleep(50);
+
+  const records = buildRecords(ratingsRows, diaryRows);
+
+  if (apiKey) {
+    await enrichRecords(records, apiKey, (done, total) => {
+      const pct = 30 + Math.round((done / total) * 60);
+      showProgress('Enriching with OMDb…', `${done} / ${total} films`, pct);
+    });
+  }
+
+  showProgress('Computing insights…', '', 92);
+  await sleep(50);
+
+  const insights = computeInsights(records);
+
+  showProgress('Rendering report…', '', 98);
+  await sleep(80);
+
+  document.getElementById('progress-phase').style.display = 'none';
+  document.getElementById('report-phase').style.display = 'block';
+
+  renderReport(insights, records);
+}
+</script>
+</body>
+</html>

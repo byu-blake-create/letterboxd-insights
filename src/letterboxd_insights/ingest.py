@@ -26,6 +26,11 @@ class IngestError(RuntimeError):
     pass
 
 
+_RATINGS_FILES = {"ratings.csv"}
+_WATCH_EVENT_FILES = {"diary.csv"}
+_SKIP_DIRS = {"lists", "deleted", "orphaned"}
+
+
 def discover_csv_files(input_path: Path) -> list[Path]:
     if input_path.is_file() and input_path.suffix.lower() == ".csv":
         return [input_path]
@@ -35,63 +40,80 @@ def discover_csv_files(input_path: Path) -> list[Path]:
 
 
 def load_letterboxd_exports(input_path: Path) -> dict[str, FilmRecord]:
-    files = discover_csv_files(input_path)
-    if not files:
-        raise IngestError(f"No CSV files found under: {input_path}")
+    if not input_path.exists():
+        raise IngestError(f"Input path does not exist: {input_path}")
 
     records: dict[str, FilmRecord] = {}
 
-    for csv_file in files:
-        with csv_file.open("r", encoding="utf-8-sig", newline="") as f:
-            reader = csv.DictReader(f)
-            if not reader.fieldnames:
+    if input_path.is_file():
+        _ingest_file(input_path, records, load_ratings=True, load_events=True)
+        return records
+
+    for csv_file in sorted(input_path.glob("*.csv")):
+        name = csv_file.name.lower()
+        load_ratings = name in _RATINGS_FILES
+        load_events = name in _WATCH_EVENT_FILES
+        if load_ratings or load_events:
+            _ingest_file(csv_file, records, load_ratings=load_ratings, load_events=load_events)
+
+    return records
+
+
+def _ingest_file(
+    csv_file: Path,
+    records: dict[str, FilmRecord],
+    load_ratings: bool,
+    load_events: bool,
+) -> None:
+    with csv_file.open("r", encoding="utf-8-sig", newline="") as f:
+        reader = csv.DictReader(f)
+        if not reader.fieldnames:
+            return
+
+        normalized_keys = {k: _normalize_key(k) for k in reader.fieldnames}
+
+        for row in reader:
+            normalized_row = {
+                normalized_keys.get(k, _normalize_key(k)): (v or "").strip() for k, v in row.items() if k
+            }
+
+            title = _first_value(normalized_row, FIELD_ALIASES["title"])
+            year = _parse_int(_first_value(normalized_row, FIELD_ALIASES["year"]))
+            uri = _first_value(normalized_row, FIELD_ALIASES["uri"])
+
+            if not title and not uri:
                 continue
 
-            normalized_keys = {k: _normalize_key(k) for k in reader.fieldnames}
+            film_id = _build_film_id(None, title, year)
+            if film_id not in records:
+                records[film_id] = FilmRecord(
+                    film_id=film_id,
+                    title=title or "Unknown",
+                    year=year,
+                    letterboxd_uri=uri,
+                )
 
-            for row in reader:
-                normalized_row = {
-                    normalized_keys.get(k, _normalize_key(k)): (v or "").strip() for k, v in row.items() if k
-                }
+            record = records[film_id]
+            if title and record.title == "Unknown":
+                record.title = title
+            if year and record.year is None:
+                record.year = year
+            if uri and not record.letterboxd_uri:
+                record.letterboxd_uri = uri
 
-                title = _first_value(normalized_row, FIELD_ALIASES["title"])
-                year = _parse_int(_first_value(normalized_row, FIELD_ALIASES["year"]))
-                uri = _first_value(normalized_row, FIELD_ALIASES["uri"])
-
-                if not title and not uri:
-                    continue
-
-                film_id = _build_film_id(uri, title, year)
-                if film_id not in records:
-                    records[film_id] = FilmRecord(
-                        film_id=film_id,
-                        title=title or "Unknown",
-                        year=year,
-                        letterboxd_uri=uri,
-                    )
-
-                record = records[film_id]
-                if title and record.title == "Unknown":
-                    record.title = title
-                if year and record.year is None:
-                    record.year = year
-                if uri and not record.letterboxd_uri:
-                    record.letterboxd_uri = uri
-
+            if load_ratings:
                 rating_raw = _first_value(normalized_row, FIELD_ALIASES["rating"])
                 rating = parse_rating(rating_raw)
                 if rating is not None:
                     record.ratings.append(rating)
 
+            if load_events:
                 date_raw = _first_value(normalized_row, FIELD_ALIASES["date"])
                 rewatch_raw = _first_value(normalized_row, FIELD_ALIASES["rewatch"])
                 watched_on = _parse_date(date_raw)
                 rewatch = _parse_bool(rewatch_raw)
-
                 if watched_on is not None or rewatch:
                     record.watch_events.append(WatchEvent(watched_on=watched_on, rewatch=rewatch))
-
-    return records
 
 
 def parse_rating(raw: str | None) -> float | None:
