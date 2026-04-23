@@ -240,7 +240,7 @@ let selectedFile = null;
 // Restore last session
 const REPORT_KEY = 'lbd_last_report_v1';
 function saveReport(insights, films) {
-  try { localStorage.setItem(REPORT_KEY, JSON.stringify({ insights, films, saved: new Date().toLocaleString() })); } catch {}
+  try { localStorage.setItem(REPORT_KEY, JSON.stringify({ insights, films, saved: new Date().toLocaleString() })); } catch(e) { console.error('Letterstats: failed to save session', e); }
 }
 function loadSavedReport() {
   try { return JSON.parse(localStorage.getItem(REPORT_KEY)); } catch { return null; }
@@ -541,6 +541,20 @@ function renderReport(insights, records, precomputedFilms = null) {
     <div class="section"><h2>Top Genres</h2>${makeCanvas('c-genre')}</div>
   `;
 
+  // Compute films early so saveReport runs before any chart rendering errors
+  const films = precomputedFilms || [...records.values()].map(r => ({
+    title: r.title, year: r.year,
+    rating: r.ratings.length ? Math.round((r.ratings.reduce((a,b)=>a+b,0)/r.ratings.length)*10)/10 : null,
+    watches: r.watchEvents.length || 1,
+    genres: r.metadata.genres || [],
+    directors: r.metadata.directors || [],
+    actors: r.metadata.actors || [],
+    uri: r.uri || '',
+    watchYears: [...new Set(r.watchEvents.map(e=>e.date?.slice(0,4)).filter(Boolean))],
+    watchMonths: [...new Set(r.watchEvents.map(e=>e.date?.slice(0,7)).filter(Boolean))],
+  }));
+  if (!precomputedFilms) saveReport(insights, films);
+
   // Modal helpers (defined here so they close over `films`)
   function openModal(title, list) {
     document.getElementById('modal-title').textContent = title;
@@ -602,19 +616,6 @@ function renderReport(insights, records, precomputedFilms = null) {
   }
 
   // Search & Filter
-  const films = precomputedFilms || [...records.values()].map(r => ({
-    title: r.title, year: r.year,
-    rating: r.ratings.length ? Math.round((r.ratings.reduce((a,b)=>a+b,0)/r.ratings.length)*10)/10 : null,
-    watches: r.watchEvents.length || 1,
-    genres: r.metadata.genres || [],
-    directors: r.metadata.directors || [],
-    actors: r.metadata.actors || [],
-    uri: r.uri || '',
-    watchYears: [...new Set(r.watchEvents.map(e=>e.date?.slice(0,4)).filter(Boolean))],
-    watchMonths: [...new Set(r.watchEvents.map(e=>e.date?.slice(0,7)).filter(Boolean))],
-  }));
-  if (!precomputedFilms) saveReport(insights, films);
-
   const allGenres = [...new Set(films.flatMap(f=>f.genres))].sort();
   const allDecades = [...new Set(films.map(f=>f.year?Math.floor(f.year/10)*10:null).filter(Boolean))].sort();
   const gSel = document.getElementById('f-genre');
