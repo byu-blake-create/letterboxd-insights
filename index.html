@@ -113,6 +113,16 @@
       padding: 0.55rem 0.7rem; color: var(--text); font-size: 0.85rem; outline: none;
     }
     input[type=search]:focus, select:focus { border-color: var(--green); }
+    .chart-wrap canvas { cursor: pointer; }
+    .modal-overlay { display: none; position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.75); align-items: center; justify-content: center; padding: 1rem; }
+    .modal-overlay.open { display: flex; }
+    .modal-box { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; width: 100%; max-width: 580px; max-height: 80vh; display: flex; flex-direction: column; }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .modal-header h3 { font-size: 1rem; color: var(--text); }
+    .modal-header .modal-count { font-size: 0.8rem; color: var(--muted); margin-left: 0.5rem; }
+    .modal-close { background: none; border: none; color: var(--muted); font-size: 1.1rem; cursor: pointer; padding: 0.2rem 0.4rem; border-radius: 4px; }
+    .modal-close:hover { color: var(--text); background: var(--surface2); }
+    .modal-body { overflow-y: auto; padding: 0.25rem 0; }
   </style>
 </head>
 <body>
@@ -155,6 +165,20 @@
   <div class="progress-title" id="progress-title">Processing…</div>
   <div class="progress-label" id="progress-label"></div>
   <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progress-bar"></div></div>
+</div>
+
+<!-- Chart Modal -->
+<div class="modal-overlay" id="chart-modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div><h3 id="modal-title"></h3></div>
+      <div style="display:flex;align-items:center;gap:0.75rem">
+        <span class="modal-count" id="modal-count"></span>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
 </div>
 
 <!-- Report Phase -->
@@ -517,19 +541,61 @@ function renderReport(insights, records, precomputedFilms = null) {
     <div class="section"><h2>Top Genres</h2>${makeCanvas('c-genre')}</div>
   `;
 
+  // Modal helpers (defined here so they close over `films`)
+  function openModal(title, list) {
+    document.getElementById('modal-title').textContent = title;
+    document.getElementById('modal-count').textContent = list.length + ' film' + (list.length !== 1 ? 's' : '');
+    document.getElementById('modal-body').innerHTML = list.length ? list.map(f => {
+      const href = f.uri ? `href="${f.uri}" target="_blank"` : '';
+      const dirs = f.directors?.length ? `<span style="color:var(--muted);font-size:0.78rem">Dir: ${f.directors.join(', ')}</span>` : '';
+      const gens = f.genres?.length ? `<span style="color:var(--muted);font-size:0.78rem">${f.genres.slice(0,3).join(' · ')}</span>` : '';
+      const full = Math.floor(f.rating||0), half = (f.rating||0)%1>=0.5?1:0;
+      const stars = f.rating !== null ? `<span style="color:#f5c518;font-size:0.8rem">${'★'.repeat(full)}${half?'½':''}</span> <span style="color:var(--muted);font-size:0.75rem">${f.rating}</span>` : '';
+      return `<div style="display:grid;grid-template-columns:1fr auto;gap:0.3rem 1rem;padding:0.6rem 1.25rem;border-bottom:1px solid var(--border);align-items:start;">
+        <div>
+          <a ${href} style="color:var(--text);text-decoration:none;font-size:0.92rem;font-weight:500">${f.title}</a>
+          <span style="color:var(--muted);font-size:0.8rem;margin-left:0.35rem">${f.year||''}</span>
+          <div style="margin-top:0.2rem;display:flex;flex-wrap:wrap;gap:0.35rem">${dirs}${gens}</div>
+        </div>
+        <div style="white-space:nowrap;padding-top:0.1rem">${stars}</div>
+      </div>`;
+    }).join('') : "<p style='padding:1rem;color:var(--muted);font-size:0.9rem'>No films found.</p>";
+    document.getElementById('chart-modal').classList.add('open');
+  }
+  window.closeModal = () => document.getElementById('chart-modal').classList.remove('open');
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+  function chartClick(filterFn, titleFn) {
+    return (evt, els, chart) => {
+      if (!els.length) return;
+      const label = chart.data.labels[els[0].index];
+      const matched = films.filter(f => filterFn(f, label));
+      openModal(titleFn(label), matched.sort((a,b) => (b.rating||0)-(a.rating||0)));
+    };
+  }
+
   const mk = (id, type, labels, values, color, opts={}) => new Chart(document.getElementById(id), {
     type, data: { labels, datasets: [{ data: values, backgroundColor: type==='bar'?color:'transparent', borderColor: color, borderRadius: type==='bar'?6:0, fill: false, tension: 0.3, pointRadius: 4, pointBackgroundColor: color }] },
     options: { ...chartDefaults, ...opts }
   });
 
-  mk('c-rating','bar', insights.rating_distribution.map(x=>x.name+' ★'), insights.rating_distribution.map(x=>x.count), '#00e054');
-  mk('c-yearly','bar', insights.yearly.map(x=>x.name), insights.yearly.map(x=>x.count), '#40bcf4');
-  mk('c-decade','bar', insights.decades.map(x=>x.name+'s'), insights.decades.map(x=>x.count), '#f5a623');
-  mk('c-monthly','line', insights.monthly.map(x=>x.name), insights.monthly.map(x=>x.count), '#00e054');
+  mk('c-rating','bar', insights.rating_distribution.map(x=>x.name+' ★'), insights.rating_distribution.map(x=>x.count), '#00e054', {
+    onClick: chartClick((f,l) => f.rating !== null && parseFloat(f.rating) === parseFloat(l), l => l + ' — Rated Films')
+  });
+  mk('c-yearly','bar', insights.yearly.map(x=>x.name), insights.yearly.map(x=>x.count), '#40bcf4', {
+    onClick: chartClick((f,l) => (f.watchYears||[]).includes(l), l => 'Films watched in ' + l)
+  });
+  mk('c-decade','bar', insights.decades.map(x=>x.name+'s'), insights.decades.map(x=>x.count), '#f5a623', {
+    onClick: chartClick((f,l) => f.year && Math.floor(f.year/10)*10 === parseInt(l), l => 'Films from the ' + l)
+  });
+  mk('c-monthly','line', insights.monthly.map(x=>x.name), insights.monthly.map(x=>x.count), '#00e054', {
+    onClick: chartClick((f,l) => (f.watchMonths||[]).includes(l), l => 'Films watched in ' + l)
+  });
 
   if (insights.genres.length) {
     mk('c-genre','bar', insights.genres.map(x=>x.name), insights.genres.map(x=>x.count), '#9b59b6', {
-      indexAxis:'y', scales:{ x:{grid:GRID,ticks:TICK}, y:{grid:GRID,ticks:{...TICK,font:{size:12}}} }
+      indexAxis:'y', scales:{ x:{grid:GRID,ticks:TICK}, y:{grid:GRID,ticks:{...TICK,font:{size:12}}} },
+      onClick: chartClick((f,l) => (f.genres||[]).includes(l), l => l + ' Films')
     });
   } else {
     document.getElementById('c-genre').parentElement.innerHTML = "<p class='no-data' style='padding:1rem'>No genre data — add an OMDb API key to enable.</p>";
@@ -544,6 +610,8 @@ function renderReport(insights, records, precomputedFilms = null) {
     directors: r.metadata.directors || [],
     actors: r.metadata.actors || [],
     uri: r.uri || '',
+    watchYears: [...new Set(r.watchEvents.map(e=>e.date?.slice(0,4)).filter(Boolean))],
+    watchMonths: [...new Set(r.watchEvents.map(e=>e.date?.slice(0,7)).filter(Boolean))],
   }));
   if (!precomputedFilms) saveReport(insights, films);
 
