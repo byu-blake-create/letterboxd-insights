@@ -429,8 +429,10 @@ function computeInsights(records) {
 function renderReport(insights, records) {
   const s = insights.summary;
   const avgR = s.avg_rating || 0;
-  const starsFull = Math.round(avgR);
-  const starsStr = '★'.repeat(starsFull) + '☆'.repeat(5 - starsFull);
+  const starsFull = Math.floor(avgR);
+  const starsHalf = avgR % 1 >= 0.5 ? 1 : 0;
+  const starsEmpty = 5 - starsFull - starsHalf;
+  const starsStr = '★'.repeat(starsFull) + (starsHalf ? '½' : '') + '☆'.repeat(starsEmpty);
 
   document.getElementById('report-meta').textContent = 'Generated ' + new Date().toLocaleString();
 
@@ -442,28 +444,6 @@ function renderReport(insights, records) {
     <div class="stat-card"><div class="val"><span style="color:#f5c518">${starsStr}</span><br><span style="font-size:1.1rem">${avgR}</span></div><div class="label">Avg Rating</div></div>
     <div class="stat-card"><div class="val">${s.runtime_hours > 0 ? s.runtime_hours + 'h' : '—'}</div><div class="label">Total Runtime${s.runtime_hours === 0 ? '<br><span style="font-size:0.7rem;color:var(--muted)">(needs OMDb)</span>' : ''}</div></div>
   `;
-
-  // Rating % breakdown
-  const totalRated = insights.rating_distribution.reduce((a,b) => a + b.count, 0);
-  const ratingColors = { '0.5':'#e53935','1.0':'#e57373','1.5':'#ff8a65','2.0':'#ffa726','2.5':'#ffca28','3.0':'#d4e157','3.5':'#aed581','4.0':'#66bb6a','4.5':'#26a69a','5.0':'#00e054' };
-  const breakdownHTML = insights.rating_distribution.slice().reverse().map(r => {
-    const pct = totalRated ? Math.round(r.count / totalRated * 100) : 0;
-    const barW = totalRated ? Math.round(r.count / totalRated * 100) : 0;
-    const color = ratingColors[parseFloat(r.name).toFixed(1)] || 'var(--green)';
-    return `<div style="display:grid;grid-template-columns:3rem 1fr 2.5rem 2.5rem;gap:0.4rem;align-items:center;padding:0.2rem 0;">
-      <span style="font-size:0.8rem;color:var(--muted);text-align:right">${r.name}★</span>
-      <div style="background:var(--surface2);border-radius:4px;height:8px;overflow:hidden">
-        <div style="width:${barW}%;height:100%;background:${color};border-radius:4px;transition:width 0.4s"></div>
-      </div>
-      <span style="font-size:0.75rem;color:var(--muted);text-align:right">${r.count}</span>
-      <span style="font-size:0.75rem;color:var(--text);text-align:right;font-weight:600">${pct}%</span>
-    </div>`;
-  }).join('');
-
-  const breakdownEl = document.createElement('div');
-  breakdownEl.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1rem 1.25rem;margin-bottom:2.5rem;';
-  breakdownEl.innerHTML = `<div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:0.75rem">Rating Breakdown</div>${breakdownHTML}`;
-  document.getElementById('stat-grid').after(breakdownEl);
 
   const GRID = { color: 'rgba(255,255,255,0.06)' };
   const TICK = { color: '#7a8a94', font: { size: 11 } };
